@@ -1,0 +1,152 @@
+import React, { useState, useEffect } from "react";
+import "./App.css";
+
+const API_KEY = "f7c9b50b";
+
+const Imdb = () => {
+  const [searchTerm, setSearchTerm] = useState("Avengers");
+  const [movies, setMovies] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Debounce the search and fetch movies from the API
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (searchTerm.trim() !== "") {
+        fetchMovies(searchTerm.trim());
+      }
+    }, 500);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchTerm]);
+
+  const fetchMovies = async (query) => {
+    try {
+      console.log(`Fetching movies for: ${query}`);
+
+      const response = await fetch(
+        `https://www.omdbapi.com/?apikey=${API_KEY}&s=${query}&type=movie`
+      );
+      const data = await response.json();
+      console.log("API Response:", data);
+
+      if (data.Response === "True") {
+        const detailedMovies = await Promise.all(
+          data.Search.map(async (movie) => {
+            const detailsResponse = await fetch(
+              `https://www.omdbapi.com/?apikey=${API_KEY}&i=${movie.imdbID}`
+            );
+            const details = await detailsResponse.json();
+            console.log("Movie Details:", details);
+
+            return {
+              ...movie,
+              imdbRating: details.imdbRating || "N/A",
+              plot: details.Plot || "No plot available.",
+              Genre: details.Genre || "Unknown",
+              Poster:
+                details.Poster !== "N/A" ? details.Poster : "https://via.placeholder.com/150",
+            };
+          })
+        );
+        setMovies(detailedMovies);
+      } else {
+        console.warn("No movies found.");
+        setMovies([]);
+      }
+    } catch (error) {
+      console.error("Error fetching movies:", error);
+    }
+  };
+
+  const addToCart = (movie) => {
+    setCart((prevCart) => [...prevCart, movie]);
+  };
+
+  const removeFromCart = (imdbID) => {
+    setCart((prevCart) => prevCart.filter((movie) => movie.imdbID !== imdbID));
+  };
+
+  const toggleCart = () => {
+    setIsCartOpen((prev) => !prev);
+  };
+
+  return (
+    <div className="app">
+      {/* Header Section */}
+      <header className="header">
+        <h1 className="logo" onClick={() => setSearchTerm("Avengers")}>
+          IMDB
+        </h1>
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search for movies..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <div className="cart-icon" onClick={toggleCart}>
+          🛒<span className="cart-count">{cart.length}</span>
+        </div>
+      </header>
+
+      {/* Main Content Section */}
+      <main>
+        <h2 className="section-title">Movie Listings</h2>
+        <div className="movies-grid">
+          {movies.length > 0 ? (
+            movies.map((movie) => (
+              <div key={movie.imdbID} className="movie-card">
+                <img src={movie.Poster} alt={movie.Title} className="movie-poster" />
+                <div className="movie-info">
+                  <h3>{movie.Title}</h3>
+                  <p>Year: {movie.Year}</p>
+                  <p>IMDb Rating: ⭐ {movie.imdbRating}</p>
+                  <p>Genre: {movie.Genre}</p>
+                  <p className="plot">{movie.plot}</p>
+                  <button className="add-to-cart" onClick={() => addToCart(movie)}>
+                    Add to Favorites
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p>No movies found for your search.</p>
+          )}
+        </div>
+      </main>
+
+      {/* Cart Modal */}
+      {isCartOpen && (
+        <div className="cart-modal">
+          <div className="cart-content">
+            <h2>Your Favorites</h2>
+            <button className="close-cart" onClick={toggleCart}>
+              Close
+            </button>
+            {cart.length === 0 ? (
+              <p>Your favorites list is empty.</p>
+            ) : (
+              cart.map((movie) => (
+                <div key={movie.imdbID} className="cart-item">
+                  <img src={movie.Poster} alt={movie.Title} className="cart-item-poster" />
+                  <div>
+                    <h3>{movie.Title}</h3>
+                    <p>Year: {movie.Year}</p>
+                    <p>IMDb Rating: ⭐ {movie.imdbRating}</p>
+                    <p>Genre: {movie.Genre}</p>
+                    <button className="remove-from-cart" onClick={() => removeFromCart(movie.imdbID)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Imdb;
